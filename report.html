@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="ar">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>تقرير المرتبات</title>
+
+    <style>
+      .my-link {
+        text-decoration: none;
+        color: white;
+        transition: 0.3s;
+      }
+
+      .my-link:hover {
+        color: #a39797;
+      }
+
+      .footer {
+        background: #0a2540;
+        color: #fff;
+        margin-top: 40px;
+        border-radius: 20px 20px 0 0;
+      }
+      .footer-bottom {
+        text-align: center;
+        padding: 12px;
+        background: #081c30;
+        font-size: 13px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      body {
+        font-family: Cairo, sans-serif;
+        background: #f0f8ff;
+        direction: rtl;
+        padding: 10px;
+      }
+
+      .box {
+        background: #fff;
+        padding: 15px;
+        border-radius: 14px;
+        max-width: 1100px;
+        margin: auto;
+      }
+
+      h2,
+      h3 {
+        text-align: center;
+      }
+
+      input {
+        width: 100%;
+        padding: 12px;
+        margin-bottom: 12px;
+        border-radius: 10px;
+        border: 1px solid #aaa;
+        font-size: 16px;
+      }
+
+      #totals {
+        background: #eef6ff;
+        border-radius: 12px;
+        padding: 12px;
+        margin: 15px 0;
+        font-size: 15px;
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+        margin-bottom: 20px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 650px;
+      }
+
+      th,
+      td {
+        border: 1px solid #ccc;
+        padding: 8px;
+        text-align: center;
+        font-size: 14px;
+      }
+
+      th {
+        background: #008cff;
+        color: #fff;
+      }
+
+      button {
+        border: none;
+        padding: 8px 12px;
+        border-radius: 8px;
+        color: #fff;
+        cursor: pointer;
+        font-size: 14px;
+        margin: 3px;
+      }
+
+      .del {
+        background: #e53935;
+      }
+
+      .pay {
+        background: #43a047;
+      }
+
+      #printPdf {
+        background: #ff8c00;
+        transition: 0.3s;
+      }
+      #print {
+        color: #000;
+      }
+
+      #backBtn {
+        background: #00bfff;
+        font-weight: bold;
+        font-size: 16px;
+        padding: 12px;
+        border-radius: 12px;
+        width: 100%;
+        margin-top: 10px;
+      }
+
+      .actions {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-top: 15px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="box" id="reportContent">
+      <h2>📄 تقرير المرتبات</h2>
+      <p id="currentTime" style="text-align: center; color: #555"></p>
+
+      <input id="search" placeholder="🔍 بحث باسم العامل" />
+
+      <!-- ✅ الإجماليات -->
+      <div id="totals" style="text-align: center; font-weight: bold">
+        💼 إجمالي المرتبات: <span id="totalSalary">0</span> | 💸 إجمالي المدفوع:
+        <span id="totalReceived">0</span> | ⏳ إجمالي المتبقي:
+        <span id="totalRemaining">0</span> | ➕ إجمالي الزيادة:
+        <span id="totalOver">0</span>
+      </div>
+
+      <h3>⚠️ لديهم متبقي</h3>
+      <div class="table-wrap">
+        <table id="remain"></table>
+      </div>
+
+      <h3>✅ تم الدفع كامل</h3>
+      <div class="table-wrap">
+        <table id="full"></table>
+      </div>
+
+      <h3>💰 أخذوا أكثر من المرتب</h3>
+      <div class="table-wrap">
+        <table id="over"></table>
+      </div>
+
+      <div class="actions">
+        <button id="backBtn" onclick="location.href='index.html'">عودة</button>
+        <button id="printPdf">🧾 تنزيل PDF</button>
+        <button id="print" onclick="window.print()">🖨️ طباعة</button>
+      </div>
+    </div>
+    <footer class="footer">
+      <div class="footer-bottom">
+        <a href="" class="my-link" target="_blank">Eyad Abdallah</a> . All
+        rights reserved . <span id="year"></span> &copy;
+      </div>
+    </footer>
+
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+    <!-- jsPDF & html2canvas -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <script>
+      document.getElementById("year").textContent = new Date().getFullYear();
+
+      const search = document.getElementById("search");
+      const remain = document.getElementById("remain");
+      const full = document.getElementById("full");
+      const over = document.getElementById("over");
+      const currentTime = document.getElementById("currentTime");
+
+      const totalSalaryEl = document.getElementById("totalSalary");
+      const totalReceivedEl = document.getElementById("totalReceived");
+      const totalRemainingEl = document.getElementById("totalRemaining");
+      const totalOverEl = document.getElementById("totalOver");
+
+      var firebaseConfig = {
+        apiKey: "AIzaSyAu9HDit-G8JllC-wcTmvXx7vchWmNs9ms",
+        authDomain: "ali-eisesy.firebaseapp.com",
+        databaseURL: "https://ali-eisesy-default-rtdb.firebaseio.com",
+        projectId: "ali-eisesy",
+        storageBucket: "ali-eisesy.appspot.com",
+        messagingSenderId: "31241139042",
+        appId: "1:31241139042:web:66b06edcded73616c8f23b",
+      };
+
+      firebase.initializeApp(firebaseConfig);
+      var db = firebase.database();
+
+      let data = [],
+        keys = [];
+
+      function updateTime() {
+        currentTime.innerText = new Date().toLocaleString("ar-EG");
+      }
+      updateTime();
+      setInterval(updateTime, 1000);
+
+      db.ref("workers").on("value", (snap) => {
+        data = [];
+        keys = [];
+        snap.forEach((c) => {
+          data.push(c.val());
+          keys.push(c.key);
+        });
+        render();
+      });
+
+      function render() {
+        const s = search.value.toLowerCase();
+
+        let totalSalary = 0;
+        let totalReceived = 0;
+        let totalRemaining = 0;
+        let totalOver = 0;
+
+        remain.innerHTML =
+          "<tr><th>الاسم</th><th>الموقع</th><th>المرتب</th><th>المستلم</th><th>المتبقي</th><th>التاريخ</th><th>إجراء</th></tr>";
+        full.innerHTML =
+          "<tr><th>الاسم</th><th>الموقع</th><th>المرتب</th><th>المستلم</th><th>التاريخ</th><th>إجراء</th></tr>";
+        over.innerHTML =
+          "<tr><th>الاسم</th><th>الموقع</th><th>المرتب</th><th>المستلم</th><th>الزيادة</th><th>التاريخ</th><th>إجراء</th></tr>";
+
+        data.forEach((d, i) => {
+          if (s && !d.name.toLowerCase().includes(s)) return;
+
+          totalSalary += d.salary;
+          totalReceived += d.received;
+
+          let websiteLink = d.website
+            ? `<a href="${d.website}" target="_blank">${d.website}</a>`
+            : "-";
+
+          if (d.received > d.salary) {
+            const extra = d.received - d.salary;
+            totalOver += extra;
+
+            over.innerHTML += `
+        <tr>
+          <td>${d.name}</td>
+          <td>${websiteLink}</td>
+          <td>${d.salary}</td>
+          <td>${d.received}</td>
+          <td>${extra}</td>
+          <td>${d.date}</td>
+          <td><button class="del" onclick="del('${keys[i]}')">مسح</button></td>
+        </tr>`;
+          } else if (d.remaining > 0) {
+            totalRemaining += d.remaining;
+
+            remain.innerHTML += `
+        <tr>
+          <td>${d.name}</td>
+          <td>${websiteLink}</td>
+          <td>${d.salary}</td>
+          <td>${d.received}</td>
+          <td>${d.remaining}</td>
+          <td>${d.date}</td>
+          <td>
+            <button class="pay" onclick="payMore('${keys[i]}')">دفع</button>
+            <button class="del" onclick="del('${keys[i]}')">مسح</button>
+          </td>
+        </tr>`;
+          } else {
+            full.innerHTML += `
+        <tr>
+          <td>${d.name}</td>
+          <td>${websiteLink}</td>
+          <td>${d.salary}</td>
+          <td>${d.received}</td>
+          <td>${d.date}</td>
+          <td><button class="del" onclick="del('${keys[i]}')">مسح</button></td>
+        </tr>`;
+          }
+        });
+
+        totalSalaryEl.innerText = totalSalary;
+        totalReceivedEl.innerText = totalReceived;
+        totalRemainingEl.innerText = totalRemaining;
+        totalOverEl.innerText = totalOver;
+      }
+
+      function del(key) {
+        if (confirm("مسح هذا السجل؟")) {
+          db.ref("workers/" + key).remove();
+        }
+      }
+
+      function payMore(key) {
+        const add = Number(prompt("المبلغ الإضافي"));
+        if (!add || add <= 0) return;
+
+        db.ref("workers/" + key).once("value", (snap) => {
+          const d = snap.val();
+          d.received += add;
+          d.remaining = Math.max(0, d.salary - d.received);
+          d.date = new Date().toLocaleString("ar-EG");
+          db.ref("workers/" + key).set(d);
+        });
+      }
+
+      search.addEventListener("input", render);
+
+      document
+        .getElementById("printPdf")
+        .addEventListener("click", async () => {
+          const { jsPDF } = window.jspdf;
+          const content = document.getElementById("reportContent");
+
+          const canvas = await html2canvas(content, { scale: 2 });
+          const imgData = canvas.toDataURL("image/png");
+
+          const pdf = new jsPDF("p", "mm", "a4");
+          const w = pdf.internal.pageSize.getWidth();
+          const h = (canvas.height * w) / canvas.width;
+
+          pdf.addImage(imgData, "PNG", 0, 0, w, h);
+          pdf.save("تقرير_المرتبات.pdf");
+        });
+    </script>
+  </body>
+</html>
