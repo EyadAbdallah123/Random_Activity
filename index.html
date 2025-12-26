@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ar">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>نظام دفع المرتبات</title>
+
+    <style>
+      body {
+        font-family: Cairo;
+        background: linear-gradient(135deg, #0a84ff, #6ac2ff);
+        direction: rtl;
+        min-height: 100vh;
+        display: flex;
+      }
+
+      .container {
+        background: #fff;
+        padding: 25px;
+        border-radius: 16px;
+        width: 100%;
+        max-width: 500px;
+        margin: auto;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+      }
+
+      h2 {
+        text-align: center;
+      }
+
+      input {
+        width: 100%;
+        padding: 10px;
+        margin: 6px 0;
+        border-radius: 10px;
+        border: 1px solid #aaa;
+      }
+
+      button {
+        width: 100%;
+        padding: 12px;
+        margin-top: 10px;
+        border: none;
+        border-radius: 10px;
+        background: #008cff;
+        color: #fff;
+        font-size: 16px;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <h2>💰 دفع مرتب عامل</h2>
+
+      <input id="name" placeholder="اسم العامل" />
+      <input id="website" placeholder="رابط الموقع" />
+      <input id="salary" type="number" placeholder="المرتب الكلي" />
+      <input
+        id="received"
+        type="number"
+        placeholder="المبلغ المستلم"
+        value="0"
+      />
+      <input
+        id="remaining"
+        type="number"
+        placeholder="المتبقي"
+        value="0"
+        readonly
+      />
+
+      <button onclick="pay()">💸 دفع</button>
+      <button onclick="location.href='report.html'">📄 التقرير</button>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+    <script>
+      var firebaseConfig = {
+        apiKey: "AIzaSyAu9HDit-G8JllC-wcTmvXx7vchWmNs9ms",
+        authDomain: "ali-eisesy.firebaseapp.com",
+        databaseURL: "https://ali-eisesy-default-rtdb.firebaseio.com",
+        projectId: "ali-eisesy",
+        storageBucket: "ali-eisesy.appspot.com",
+        messagingSenderId: "31241139042",
+        appId: "1:31241139042:web:66b06edcded73616c8f23b",
+      };
+      firebase.initializeApp(firebaseConfig);
+      var db = firebase.database();
+
+      const FORMSPREE_URL = "https://formspree.io/f/manrazgk";
+
+      // إزالة 0 عند التركيز على حقل المستلم
+      let receivedInput = document.getElementById("received");
+      receivedInput.addEventListener("focus", () => {
+        if (receivedInput.value == 0) receivedInput.value = "";
+      });
+      receivedInput.addEventListener("blur", () => {
+        if (receivedInput.value == "") receivedInput.value = 0;
+      });
+
+      // إرسال رسالة على الإيميل
+      function sendEmail(data) {
+        fetch(FORMSPREE_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify(data),
+        })
+          .then((res) => {
+            if (res.ok) console.log("✅ رسالة الإيميل تم إرسالها");
+            else console.log("⚠️ فشل إرسال الإيميل");
+          })
+          .catch((err) => console.log("⚠️ خطأ في الاتصال بـ Formspree", err));
+      }
+
+      // الدفع وحفظ البيانات
+      function pay() {
+        let name = document.getElementById("name").value.trim();
+        let website = document.getElementById("website").value.trim();
+        let salary = Number(document.getElementById("salary").value);
+        let received = Number(document.getElementById("received").value);
+
+        if (!name || salary <= 0) {
+          alert("⚠️ الرجاء إدخال اسم العامل والمرتب الكلي بشكل صحيح");
+          return;
+        }
+
+        let remaining = salary - received;
+        document.getElementById("remaining").value =
+          remaining > 0 ? remaining : 0;
+        let status = remaining <= 0 ? "تم دفع كامل المرتب" : "لديه متبقي";
+
+        let data = {
+          name,
+          website,
+          salary,
+          received,
+          remaining: remaining > 0 ? remaining : 0,
+          status,
+          date: new Date().toLocaleString(),
+        };
+
+        db.ref("workers").push(data);
+        sendEmail(data);
+
+        alert("✅ تم الدفع والحفظ وإرسال الإيميل (إذا كان Formspree مفعل)");
+
+        document.getElementById("name").value = "";
+        document.getElementById("website").value = "";
+        document.getElementById("salary").value = "";
+        document.getElementById("received").value = 0;
+        document.getElementById("remaining").value = 0;
+      }
+    </script>
+  </body>
+</html>
